@@ -1,9 +1,6 @@
 pipeline {
     agent any
-    tools {
-        // Remove Maven since no pom.xml in repo
-        // maven 'Maven3'
-    }
+    // Removed empty tools block
     environment {
         REGISTRY = "docker.io"
         IMAGE_NAME = "server"
