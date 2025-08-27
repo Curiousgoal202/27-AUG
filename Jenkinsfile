@@ -53,7 +53,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Starting new container..."
-                    docker run -d --name myapp -p 8080:85 $DOCKER_IMAGE
+                    docker run -d --name myapp -p 8080:80 $DOCKER_IMAGE
                 '''
             }
         }
