@@ -2,42 +2,40 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = "docker.io"
-        IMAGE_NAME = "mywebapp"
-        IMAGE_TAG = "latest"
-        DOCKERHUB_CREDENTIALS = "creds"
-        SERVER_PORT = "8085"
+        DOCKER_IMAGE = "johntech/myapp:latest"
     }
 
- 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/Curiousgoal202/27-AUG.git'
+                git url: 'https://github.com/Curiousgoal202/27-AUG.git', branch: 'master'
             }
         }
 
-    
-    
-
-       
-
-       
+      
+     
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}")
-                }
+                sh '''
+                    echo "Building Docker image..."
+                    docker build -t $DOCKER_IMAGE .
+                '''
             }
         }
 
         stage('Push Docker Image') {
+            when {
+                expression { return env.DOCKERHUB_USER != null && env.DOCKERHUB_PASS != null }
+            }
             steps {
-                script {
-                    docker.withRegistry("https://${REGISTRY}", "${DOCKERHUB_CREDENTIALS}") {
-                        dockerImage.push()
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                 usernameVariable: 'DOCKERHUB_USER',
+                                                 passwordVariable: 'DOCKERHUB_PASS')]) {
+                    sh '''
+                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                        docker push $DOCKER_IMAGE
+                    '''
                 }
             }
         }
@@ -45,8 +43,8 @@ pipeline {
         stage('Stop Old Container') {
             steps {
                 sh '''
-                  echo "Stopping old container..."
-                  docker ps -q --filter "name=${IMAGE_NAME}" | grep -q . && docker stop ${IMAGE_NAME} && docker rm ${IMAGE_NAME} || true
+                    echo "Stopping old container if running..."
+                    docker rm -f myapp || true
                 '''
             }
         }
@@ -54,26 +52,28 @@ pipeline {
         stage('Run New Container') {
             steps {
                 sh '''
-                  echo "Starting new container..."
-                  docker run -d --name ${IMAGE_NAME} -p ${SERVER_PORT}:8085 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    echo "Starting new container..."
+                    docker run -d --name myapp -p 8080:85 $DOCKER_IMAGE
                 '''
             }
         }
 
-        
+        stage('Health Check') {
+            steps {
+                sh '''
+                    echo "Running Health Check..."
+                    sleep 10
+                    curl -f http://localhost:8085 || exit 1
+                '''
+            }
+        }
+    }
 
     post {
-        success {
+        always {
             emailext(
-                subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
-                body: "The pipeline finished successfully. Access app at http://<server-ip>:${SERVER_PORT}",
-                to: "santosgoal2024@gmail.com"
-            )
-        }
-        failure {
-            emailext(
-                subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
-                body: "The pipeline failed. Please check Jenkins logs.",
+                subject: "Jenkins Pipeline: ${currentBuild.currentResult}",
+                body: "Build finished with status: ${currentBuild.currentResult}\nCheck console output at: ${env.BUILD_URL}",
                 to: "santosgoal2024@gmail.com"
             )
         }
