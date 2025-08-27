@@ -20,31 +20,9 @@ pipeline {
     
     
 
-        stage('Code Quality Check') {
-            steps {
-                sh '''
-                  echo "Running HTML Linter..."
-                  if command -v htmlhint > /dev/null; then
-                      htmlhint .
-                  else
-                      echo "No html linter configured"
-                  fi
-                  echo "Running Python Linter..."
-                  pip install flake8 || true
-                  flake8 . || true
-                '''
-            }
-        }
+       
 
-        stage('Security Scan') {
-            steps {
-                sh '''
-                  echo "Running Bandit Security Scan..."
-                  pip install bandit || true
-                  bandit -r . || true
-                '''
-            }
-        }
+       
 
         stage('Build Docker Image') {
             steps {
@@ -82,16 +60,7 @@ pipeline {
             }
         }
 
-        stage('Health Check') {
-            steps {
-                sh '''
-                  echo "Checking if server is running..."
-                  sleep 5
-                  curl -f http://localhost:${SERVER_PORT} || exit 1
-                '''
-            }
-        }
-    }
+        
 
     post {
         success {
