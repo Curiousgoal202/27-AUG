@@ -77,7 +77,7 @@ pipeline {
             steps {
                 sh '''
                   echo "Starting new container..."
-                  docker run -d --name ${IMAGE_NAME} -p ${SERVER_PORT}:8080 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                  docker run -d --name ${IMAGE_NAME} -p ${SERVER_PORT}:8085 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
