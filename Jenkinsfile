@@ -5,35 +5,20 @@ pipeline {
         REGISTRY = "docker.io"
         IMAGE_NAME = "mywebapp"
         IMAGE_TAG = "latest"
-        DOCKERHUB_CREDENTIALS = "dockerhub-creds"
+        DOCKERHUB_CREDENTIALS = "creds"
         SERVER_PORT = "8085"
     }
 
-    tools {
-        maven 'Maven3'
-    }
-
+ 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/youruser/yourrepo.git'
+                git branch: 'master', url: 'https://github.com/Curiousgoal202/27-AUG.git'
             }
         }
 
-        stage('Build') {
-            steps {
-                sh 'echo "Build step - for Python no compilation needed, for Java use mvn clean package"'
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                sh '''
-                  echo "Running Python Unit Tests..."
-                  pytest || true
-                '''
-            }
-        }
+    
+    
 
         stage('Code Quality Check') {
             steps {
@@ -113,14 +98,14 @@ pipeline {
             emailext(
                 subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: "The pipeline finished successfully. Access app at http://<server-ip>:${SERVER_PORT}",
-                to: "yourmail@example.com"
+                to: "santosgoal2024@gmail.com"
             )
         }
         failure {
             emailext(
                 subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: "The pipeline failed. Please check Jenkins logs.",
-                to: "yourmail@example.com"
+                to: "santosgoal2024@gmail.com"
             )
         }
     }
