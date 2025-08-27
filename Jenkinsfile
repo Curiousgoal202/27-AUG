@@ -1,117 +1,127 @@
 pipeline {
     agent any
-    // Removed empty tools block
+
     environment {
         REGISTRY = "docker.io"
-        IMAGE_NAME = "server"
+        IMAGE_NAME = "mywebapp"
         IMAGE_TAG = "latest"
-        DOCKERHUB_CREDENTIALS = "creds"
+        DOCKERHUB_CREDENTIALS = "dockerhub-creds"
         SERVER_PORT = "8085"
     }
+
+    tools {
+        maven 'Maven3'
+    }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/Curiousgoal202/27-AUG.git'
+                git branch: 'main', url: 'https://github.com/youruser/yourrepo.git'
             }
         }
+
         stage('Build') {
             steps {
-                echo "Skipping Maven build (no pom.xml). If Python packaging needed, add here."
+                sh 'echo "Build step - for Python no compilation needed, for Java use mvn clean package"'
             }
         }
-        stage('Test') {
-            steps {
-                echo "No Java unit tests found. Add pytest/unittest if Python tests exist."
-            }
-        }
-        stage('Code Quality - Python') {
+
+        stage('Unit Tests') {
             steps {
                 sh '''
-                    pip install flake8 bandit
-                    flake8 . || true
-                    bandit -r . || true
+                  echo "Running Python Unit Tests..."
+                  pytest || true
                 '''
             }
         }
-        stage('Code Quality - HTML') {
+
+        stage('Code Quality Check') {
             steps {
                 sh '''
-                    npm install -g htmlhint
-                    htmlhint *.html || true
+                  echo "Running HTML Linter..."
+                  if command -v htmlhint > /dev/null; then
+                      htmlhint .
+                  else
+                      echo "No html linter configured"
+                  fi
+                  echo "Running Python Linter..."
+                  pip install flake8 || true
+                  flake8 . || true
                 '''
             }
         }
+
         stage('Security Scan') {
             steps {
-                sh 'docker run --rm -i hadolint/hadolint < Dockerfile || true'
+                sh '''
+                  echo "Running Bandit Security Scan..."
+                  pip install bandit || true
+                  bandit -r . || true
+                '''
             }
         }
+
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $IMAGE_NAME:$IMAGE_TAG ."
+                script {
+                    dockerImage = docker.build("${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}")
+                }
             }
         }
+
         stage('Push Docker Image') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS')]) {
-                        sh """
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            docker tag $IMAGE_NAME:$IMAGE_TAG $DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG
-                            docker push $DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG
-                        """
+                    docker.withRegistry("https://${REGISTRY}", "${DOCKERHUB_CREDENTIALS}") {
+                        dockerImage.push()
                     }
                 }
             }
         }
+
         stage('Stop Old Container') {
             steps {
-                sh """
-                    docker stop webserver || true
-                    docker rm webserver || true
-                """
+                sh '''
+                  echo "Stopping old container..."
+                  docker ps -q --filter "name=${IMAGE_NAME}" | grep -q . && docker stop ${IMAGE_NAME} && docker rm ${IMAGE_NAME} || true
+                '''
             }
         }
-        stage('Start New Container') {
+
+        stage('Run New Container') {
             steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS')]) {
-                        sh """
-                            docker run -d --name webserver -p $SERVER_PORT:80 $DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG
-                        """
-                    }
-                }
+                sh '''
+                  echo "Starting new container..."
+                  docker run -d --name ${IMAGE_NAME} -p ${SERVER_PORT}:8080 ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                '''
             }
         }
+
         stage('Health Check') {
             steps {
-                script {
-                    sh "sleep 5"
-                    sh "curl -f http://localhost:$SERVER_PORT || exit 1"
-                }
+                sh '''
+                  echo "Checking if server is running..."
+                  sleep 5
+                  curl -f http://localhost:${SERVER_PORT} || exit 1
+                '''
             }
         }
-    } // closes stages
+    }
+
     post {
         success {
-            echo "✅ Deployment successful!"
-            emailext (
-                to: 'santosgoal2024@gmail.com',
-                subject: "SUCCESS: Webserver Pipeline",
-                body: "Your webserver is up on port $SERVER_PORT"
+            emailext(
+                subject: "SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: "The pipeline finished successfully. Access app at http://<server-ip>:${SERVER_PORT}",
+                to: "yourmail@example.com"
             )
         }
         failure {
-            echo "❌ Deployment failed!"
-            emailext (
-                to: 'santosgoal2024@gmail.com',
-                subject: "FAILED: Webserver Pipeline",
-                body: "Please check the Jenkins logs for details."
+            emailext(
+                subject: "FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: "The pipeline failed. Please check Jenkins logs.",
+                to: "yourmail@example.com"
             )
         }
     }
-} // closes pipeline
+}
